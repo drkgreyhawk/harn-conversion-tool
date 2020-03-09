@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+
+  <!-- Bootstrap -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+  <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+  <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+  <!-- Custom CSS -->
+  <link href="style.css" rel="stylesheet">
+</head>
+
+<body>
+  <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+  <!-- NAVIGATION BAR -->
+  <nav id="navMenu" class="navbar navbar-inverse">
+    <div class="container-fluid">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#myNavbar">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="/">DrkGreyHawk</a>
+      </div>
+      <div class="collapse navbar-collapse" id="myNavbar">
+        <ul class="nav navbar-nav">
+          <li><a href="/">Home</a>
+          </li>
+          <li><a href="/projects">Projects</a>
+          </li>
+        </ul>
+        <ul class="nav navbar-nav navbar-right">
+          <li><a href="/sign_up"><span class="glyphicon glyphicon-user"></span> Sign Up</a>
+          </li>
+          <li><a href="/login"><span class="glyphicon glyphicon-log-in"></span> Login</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+  <!-- END NAV -->
+  
+  <div class="container-fluid text-center">
+    <div class="row content">
+      <div class="col-sm-2">
+        <img src="/images/drkgreyhawk_logo.png" alt="drkgreyhawk_logo.png">
+      </div>
+      <div class="footer-bumper col-sm-8 text-left">
+        <div style="background-color: #f2f2f2; padding: 1px 15px 5px 15px; border-radius: 5px;">
+            <form id="inputCharacter">
+                <h1>Character Converter</h1>
+                <h2>C&S to Harnmaster</h2>
+                <h5>Please input your Chivalry & Sorcery character stats accordingly.</h5>
+                <div class="row">
+                  <div class="col-xs-12">
+                      <label for="inputCharacterName">Character Name</label>
+                      <input type="text" class="form-control" name="inputCharacterName" placeholder="Character Name">
+                  </div>
+                </div>
+                <div class="row">
+                <div class="col-xs-6">
+                    <label for="inputAspect">Aspect</label>
+                    <select class="form-control" name="inputAspect">
+                    <option value="well">Well</option>
+                    <option value="neutral" selected>Neutral</option>
+                    <option value="poor">Poor</option>
+                    </select>
+                </div>
+                <div class="col-xs-6">
+                    <label for="inputLevel">Level</label>
+                    <input type="number" class="form-control" name="inputLevel" placeholder="Level" maxlength="10" required>
+                </div>
+                </div>
+                <div class="row">
+                <div class="col-xs-4">
+                    <label for="inputDexterity">DEX</label>
+                    <input type="number" class="form-control" name="inputDexterity" placeholder="10" required>
+                </div>
+                <div class="col-xs-4">
+                    <label for="inputConstitution">CON</label>
+                    <input type="number" class="form-control" name="inputConstitution" placeholder="10" required>
+                </div>
+                <div class="col-xs-4">
+                    <label for="inputStrength">STR</label>
+                    <input type="number" class="form-control" name="inputStrength" placeholder="10" required>
+                </div>
+                </div>
+                <div class="row">
+                <div class="col-xs-4">
+                    <label for="inputWisdom">WIS</label>
+                    <input type="number" class="form-control" name="inputWisdom" placeholder="10" required>
+                </div>
+                <div class="col-xs-4">
+                    <label for="inputIntelligence">INT</label>
+                    <input type="number" class="form-control" name="inputIntelligence" placeholder="10" required>
+                </div>
+                <div class="col-xs-4">
+                    <label for="inputBardicVoice">BV</label>
+                    <input type="number" class="form-control" name="inputBardicVoice" placeholder="10" required>
+                </div>
+                </div>
+                <div class="row">
+                <div class="col-xs-4">
+                    <label for="inputAppearance">APP</label>
+                    <input type="number" class="form-control" name="inputAppearance" placeholder="10" required>
+                </div>
+                <div class="col-xs-4">
+                    <label for="inputFortitude">FOR</label>
+                    <input type="number" class="form-control" name="inputFortitude" placeholder="10" required>
+                </div>
+                <div class="col-xs-4">
+                    <label for="inputPiety">PIETY</label>
+                    <input type="number" class="form-control" name="inputPiety" placeholder="0" required>
+                </div>
+                </div>
+                <div class="row">
+                <div class="col-xs-6">
+                    <label for="inputHearing">Hearing</label>
+                    <select class="form-control" name="inputHearing">
+                    </select>
+                </div>
+                <div class="col-xs-6">
+                    <label for="inputEyesight">Eyesight</label>
+                    <select class="form-control" name="inputEyesight">
+                    </select>
+                </div>
+                </div>
+                <div class="row">
+                <div class="col-xs-12">
+                    <h4>Options</h4>
+                    <input type="radio" name="finalStatsDecision" value="none" checked>Base Stats
+                    <input type="radio" name="finalStatsDecision" value="roll">Roll D6
+                    <input type="radio" name="finalStatsDecision" value="add">Add 3.5
+                </div>
+                </div>
+                <div class="row">
+                <div class="col-xs-12">
+                    Primitive Talent
+                    <br/>
+                    <input type="radio" name="primitiveTalent" value="false" checked>No
+                    <input type="radio" name="primitiveTalent" value="true">Yes
+                </div>
+                </div>
+                <div class="row">
+                <div class="col-xs-12">
+                    Generate non-converted stats
+                    <br/>
+                    <input type="radio" name="generateStats" value="false" checked>No
+                    <input type="radio" name="generateStats" value="true">Yes
+                </div>
+                </div>
+                <button type="submit" class="btn btn-primary" id="submitButton" style="margin-top: 7px;" onclick="cands_to_harnSubmit()">Submit</button>
+                <!-- MODAL -->
+                <div id="resultsModal" class="modal">
+                <div class="modal-content">
+                    <span class="close">&times;</span>
+                    <h1 style="text-align: center">Character Conversion Results</h1>
+                    <div id="theResults">
+                    </div>
+                </div>
+                </div>
+            </form>
+
+            <script src="cands-to-harn.js"></script>
+        </div>
+    </div>
+    <div class="col-sm-2">
+    </div>
+  </div>
+</div>
+
+
+
+<!-- START FOOTER -->
+  <footer class="navbar navbar-fixed-bottom" style="background-color: #222222;">
+    <div class="text-center container">
+      <span class="text-muted" style:"">© 2017 Hyrum Mack | <a href="/about">About</a> | <a href="/contact">Contact</a></span>
+    </div>
+  </footer>
+<!-- END FOOTER -->
+
+<!-- Include all compiled plugins (below), or include individual files as needed -->
+<script src="/js/bootstrap.js"></script>
+</body>
+
+</html>
