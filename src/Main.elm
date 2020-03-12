@@ -1,11 +1,11 @@
 module Main exposing (..)
 
 import Browser
-import Convert exposing (CandsStats, convert, HarnStats)
+import Convert exposing (CandsStats, HarnStats, convert)
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (custom, onClick, onInput)
-import Json.Decode exposing (succeed)
+import Html.Events exposing (custom, on, onClick, onInput, targetValue)
+import Json.Decode exposing (map, succeed)
 
 
 
@@ -36,6 +36,7 @@ type alias Model =
     , piety : String
     , hearing : String
     , eyesight : String
+    , eyesight_description : String
     , base_roll_or_add : String
     , primitive_talent : Bool
     , use_generator : Bool
@@ -72,6 +73,7 @@ init =
     , piety = ""
     , hearing = ""
     , eyesight = ""
+    , eyesight_description = ""
     , base_roll_or_add = ""
     , primitive_talent = False
     , use_generator = False
@@ -163,7 +165,15 @@ update msg state_model =
             { state_model | eyesight = updatedEyesight }
 
         BaseRollOrAddSelected updated_broa ->
-            { state_model | base_roll_or_add = updated_broa }
+            case updated_broa of
+                "Roll" ->
+                    { state_model | base_roll_or_add = "Roll" }
+
+                "Add" ->
+                    { state_model | base_roll_or_add = "Add" }
+
+                _ ->
+                    { state_model | base_roll_or_add = "" }
 
         PrimitiveTalentToggled ->
             { state_model | primitive_talent = not state_model.primitive_talent }
@@ -176,10 +186,52 @@ update msg state_model =
                 converted_stats =
                     assignCandsStats state_model
                         |> convert state_model.aspect
-            in
-            { state_model | harn_comeliness = convertFloatToString converted_stats.comeliness
-            , harn_strength = convertFloatToString converted_stats.strength }
+                        |> applyHearing state_model.hearing
+                        |> applyEyesight state_model.eyesight
+                        |> checkPrimitiveTalent state_model.primitive_talent
+                        |> checkAndGenStats state_model.use_generator
+                        |> calcBROA state_model.base_roll_or_add
 
+                veteran_points =
+                    assignVeteranPoints state_model.level
+            in
+            { state_model
+                | harn_comeliness = convertFloatToStringAndCeil converted_stats.comeliness
+                , harn_strength = convertFloatToStringAndCeil converted_stats.strength
+                , harn_stamina = convertFloatToStringAndCeil converted_stats.stamina
+                , harn_dexterity = convertFloatToStringAndCeil converted_stats.dexterity
+                , harn_agility = convertFloatToStringAndCeil converted_stats.agility
+                , harn_smell = convertFloatToStringAndCeil converted_stats.smell
+                , harn_hearing = convertFloatToStringAndCeil converted_stats.hearing
+                , harn_eyesight = convertFloatToStringAndCeil converted_stats.eyesight
+                , eyesight_description = checkAndApplyEyesightDescription state_model.eyesight
+                , harn_voice = convertFloatToStringAndCeil converted_stats.voice
+                , harn_aura = convertFloatToStringAndCeil converted_stats.aura
+                , harn_intelligence = convertFloatToStringAndCeil converted_stats.intelligence
+                , harn_will = convertFloatToStringAndCeil converted_stats.will
+                , harn_morality = convertFloatToStringAndCeil converted_stats.morality
+                , harn_veteran_points = veteran_points
+            }
+
+
+addToEachStat : HarnStats -> HarnStats
+addToEachStat stats =
+    let
+        x = 3.5
+        newStats =
+            { stats
+                | comeliness = stats.comeliness + x
+                , strength = stats.strength + x
+                , stamina = stats.stamina + x
+                , dexterity = stats.dexterity + x
+                , voice = stats.voice + x
+                , aura = stats.aura + x
+                , intelligence = stats.intelligence + x
+                , will = stats.will + x
+            }
+    in
+    newStats
+    
 
 assignCandsStats : Model -> CandsStats
 assignCandsStats stats_model =
@@ -217,8 +269,123 @@ assignCandsStats stats_model =
     stats
 
 
+applyEyesight : String -> HarnStats -> HarnStats
+applyEyesight eyesight stats =
+    case eyesight of
+        "Farsighted" ->
+            { stats | eyesight = stats.eyesight + 1.0 }
 
--- TEST FUNCTIONS
+        "Nearsighted" ->
+            { stats | eyesight = stats.eyesight - 1.0 }
+
+        "Very Nearsighted" ->
+            { stats | eyesight = stats.eyesight - 3.0 }
+
+        "Myopic" ->
+            { stats | eyesight = stats.eyesight - 5.0 }
+
+        "Nightvision" ->
+            { stats | eyesight = stats.eyesight + 8.0 }
+
+        _ ->
+            stats
+
+
+applyHearing : String -> HarnStats -> HarnStats
+applyHearing hearing stats =
+    case hearing of
+        "Very Poor" ->
+            { stats | hearing = stats.hearing - 2.0 }
+
+        "Poor" ->
+            { stats | hearing = stats.hearing - 1.0 }
+
+        "Acute" ->
+            { stats | hearing = stats.hearing + 1.0 }
+
+        "Perfect" ->
+            { stats | hearing = stats.hearing + 2.0 }
+
+        _ ->
+            stats
+
+
+assignVeteranPoints : String -> String
+assignVeteranPoints level =
+    let
+        x =
+            calcVeteranPoints (String.toInt level)
+    in
+    x
+
+
+calcBROA : String -> HarnStats -> HarnStats
+calcBROA broa stats =
+    case broa of
+        "Add" ->
+            addToEachStat stats
+        
+        "Roll" ->
+            rollThenAddToEachStat stats
+
+        _ ->
+            stats
+
+
+calcVeteranPoints : Maybe Int -> String
+calcVeteranPoints level =
+    if Maybe.withDefault 0 level >= 9 then
+        String.fromInt (Maybe.withDefault 0 level + (Maybe.withDefault 0 level - 8))
+
+    else
+        String.fromInt (Maybe.withDefault 0 level)
+
+
+checkAndApplyEyesightDescription : String -> String
+checkAndApplyEyesightDescription selected =
+    case selected of
+        "Color Blind, Blue Yellow" ->
+            "Keep color blindness to blue and yellow and add two to any other physical attribute."
+
+        "Color Blind, Red Green" ->
+            "Keep color blindness to red and green and add two to any other physical attribute."
+
+        "Color Blind" ->
+            "Keep total color blindness and add two to any other physical attribute."
+
+        _ ->
+            ""
+
+
+checkAndGenStats : Bool -> HarnStats -> HarnStats
+checkAndGenStats gt stats =
+    if gt == True then
+        let
+            new_stats =
+                stats
+        in
+        new_stats
+
+    else
+        stats
+
+
+checkPrimitiveTalent : Bool -> HarnStats -> HarnStats
+checkPrimitiveTalent pt stats =
+    if pt == True then
+        let
+            new_stats =
+                { stats | aura = stats.aura + 3.0 }
+        in
+        new_stats
+
+    else
+        stats
+
+
+convertFloatToStringAndCeil : Float -> String
+convertFloatToStringAndCeil float =
+    String.fromInt (ceiling float)
 
 
 convertStringToInt : String -> Int
@@ -230,10 +397,9 @@ convertStringToInt string =
     Maybe.withDefault 0 result
 
 
-convertFloatToString : Float -> String
-convertFloatToString float =
-    String.fromFloat float
-
+rollThenAddToEachStat : HarnStats -> HarnStats
+rollThenAddToEachStat stats =
+    stats
 
 
 -- VIEW
@@ -293,38 +459,38 @@ view state_model =
                 ]
             , div []
                 [ label ([ for "hearing" ] ++ labelStyle) [ text "Hearing" ]
-                , select [ name "hearing" ]
-                    [ option [] [ text "Very Poor" ]
-                    , option [] [ text "Poor" ]
-                    , option [ selected True ] [ text "Normal" ]
-                    , option [] [ text "Acute" ]
-                    , option [] [ text "Perfect" ]
+                , select [ name "hearing", on "change" (Json.Decode.map HearingChanged targetValue) ]
+                    [ option [ value "Very Poor" ] [ text "Very Poor" ]
+                    , option [ value "Poor" ] [ text "Poor" ]
+                    , option [ value "Normal", selected True ] [ text "Normal" ]
+                    , option [ value "Acute" ] [ text "Acute" ]
+                    , option [ value "Perfect" ] [ text "Perfect" ]
                     ]
                 ]
             , div []
                 [ label ([ for "eyesight" ] ++ labelStyle) [ text "Eyesight" ]
-                , select [ name "eyesight" ]
-                    [ option [] [ text "Farsighted" ]
-                    , option [ selected True ] [ text "Perfect" ]
-                    , option [] [ text "Nearsighted" ]
-                    , option [] [ text "Very Nearsighted" ]
-                    , option [] [ text "Myopic" ]
-                    , option [] [ text "Colorblind to Blue and Yellow" ]
-                    , option [] [ text "Colorblind to Red and Green" ]
-                    , option [] [ text "Totally Colorblind" ]
-                    , option [] [ text "Nightvision" ]
+                , select [ name "eyesight", on "change" (Json.Decode.map EyesightChanged targetValue) ]
+                    [ option [ value "Farsighted" ] [ text "Farsighted" ]
+                    , option [ value "Perfect", selected True ] [ text "Perfect" ]
+                    , option [ value "Nearsighted" ] [ text "Nearsighted" ]
+                    , option [ value "Very Nearsighted" ] [ text "Very Nearsighted" ]
+                    , option [ value "Myopic" ] [ text "Myopic" ]
+                    , option [ value "Color Blind, Blue Yellow" ] [ text "Color Blind to Blue and Yellow" ]
+                    , option [ value "Color Blind, Red Green" ] [ text "Color Blind to Red and Green" ]
+                    , option [ value "Color Blind" ] [ text "Totally Color Blind" ]
+                    , option [ value "Nightvision" ] [ text "Nightvision" ]
                     ]
                 ]
             , div []
                 [ h4 []
                     [ text "Options" ]
-                , input [ checked True, name "finalStatsDecision", type_ "radio", value "none" ]
+                , input [ name "finalStatsDecision", type_ "radio", value "None", on "change" (Json.Decode.map BaseRollOrAddSelected targetValue) ]
                     []
                 , text "Base Stats"
-                , input [ name "finalStatsDecision", type_ "radio", value "roll" ]
+                , input [ name "finalStatsDecision", type_ "radio", value "Roll", on "change" (Json.Decode.map BaseRollOrAddSelected targetValue) ]
                     []
                 , text "Add 1d6"
-                , input [ name "finalStatsDecision", type_ "radio", value "add" ]
+                , input [ name "finalStatsDecision", type_ "radio", value "Add", on "change" (Json.Decode.map BaseRollOrAddSelected targetValue) ]
                     []
                 , text "Add 3.5"
                 ]
@@ -339,35 +505,36 @@ view state_model =
             , button [ onClickNoDefault ConvertStatsClicked ] [ text "Convert" ]
             ]
         , div resultStyle
-            [ div [] [ text state_model.name ]
-            , div [] [ text "Comeliness:" ]
-            , div [] [ text state_model.harn_comeliness ]
-            , div [] [ text "Strength:" ]
-            , div [] [ text state_model.harn_strength ]
-            , div [] [ text "Stamina:" ]
-            , div [] [ text state_model.harn_stamina ]
-            , div [] [ text "Dexterity:" ]
-            , div [] [ text state_model.harn_dexterity ]
-            , div [] [ text "Agility:" ]
-            , div [] [ text state_model.harn_agility ]
-            , div [] [ text "Smell:" ]
-            , div [] [ text state_model.harn_smell ]
-            , div [] [ text "Hearing:" ]
-            , div [] [ text state_model.harn_hearing ]
-            , div [] [ text "Eyesight:" ]
-            , div [] [ text state_model.harn_eyesight ]
-            , div [] [ text "Voice:" ]
-            , div [] [ text state_model.harn_voice ]
-            , div [] [ text "Aura:" ]
-            , div [] [ text state_model.harn_aura ]
-            , div [] [ text "Intelligence:" ]
-            , div [] [ text state_model.harn_intelligence ]
-            , div [] [ text "Will:" ]
-            , div [] [ text state_model.harn_will ]
-            , div [] [ text "Morality:" ]
-            , div [] [ text state_model.harn_morality ]
-            , div [] [ text "Veteran Points:" ]
-            , div [] [ text state_model.harn_veteran_points ]
+            [ div resultLabelStyle [ text state_model.name ]
+            , div resultLabelStyle [ text "Comeliness:" ]
+            , div resultNumberStyle [ text state_model.harn_comeliness ]
+            , div resultLabelStyle [ text "Strength:" ]
+            , div resultNumberStyle [ text state_model.harn_strength ]
+            , div resultLabelStyle [ text "Stamina:" ]
+            , div resultNumberStyle [ text state_model.harn_stamina ]
+            , div resultLabelStyle [ text "Dexterity:" ]
+            , div resultNumberStyle [ text state_model.harn_dexterity ]
+            , div resultLabelStyle [ text "Agility:" ]
+            , div resultNumberStyle [ text state_model.harn_agility ]
+            , div resultLabelStyle [ text "Smell:" ]
+            , div resultNumberStyle [ text state_model.harn_smell ]
+            , div resultLabelStyle [ text "Hearing:" ]
+            , div resultNumberStyle [ text state_model.harn_hearing ]
+            , div resultLabelStyle [ text "Eyesight:" ]
+            , div resultNumberStyle [ text state_model.harn_eyesight ]
+            , div resultNumberStyle [ text state_model.eyesight_description ]
+            , div resultLabelStyle [ text "Voice:" ]
+            , div resultNumberStyle [ text state_model.harn_voice ]
+            , div resultLabelStyle [ text "Aura:" ]
+            , div resultNumberStyle [ text state_model.harn_aura ]
+            , div resultLabelStyle [ text "Intelligence:" ]
+            , div resultNumberStyle [ text state_model.harn_intelligence ]
+            , div resultLabelStyle [ text "Will:" ]
+            , div resultNumberStyle [ text state_model.harn_will ]
+            , div resultLabelStyle [ text "Morality:" ]
+            , div resultNumberStyle [ text state_model.harn_morality ]
+            , div resultLabelStyle [ text "Veteran Points:" ]
+            , div resultNumberStyle [ text state_model.harn_veteran_points ]
             ]
         ]
 
@@ -420,6 +587,19 @@ labelStyle =
 resultStyle : List (Attribute msg)
 resultStyle =
     [ style "padding" "10px 10px 10px 350px"
+    , style "font-family" "Arial"
+    ]
+
+
+resultLabelStyle : List (Attribute msg)
+resultLabelStyle =
+    [ style "font-weight" "bold"
+    ]
+
+
+resultNumberStyle : List (Attribute msg)
+resultNumberStyle =
+    [ style "font-family" "\"Courier New\""
     ]
 
 
