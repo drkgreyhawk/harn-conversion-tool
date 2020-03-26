@@ -1,64 +1,102 @@
 module Main exposing (..)
 
-import Browser
+import Browser exposing (Document, UrlRequest)
+import Browser.Navigation as Nav
 import Convert exposing (CandsStats, HarnStats, convert)
-import Html exposing (..)
-import Html.Attributes exposing (..)
-import Html.Events exposing (custom, on, onClick, onInput, targetValue)
-import Json.Decode exposing (map, succeed)
+import Element exposing (..)
+import Element.Background as Background
+import Element.Border as Border
+import Element.Font as Font
+import Element.Input as Input
+import Html exposing (Html)
+import Json.Decode exposing (map)
+import Random as R
+import Round exposing (ceiling)
+import Url as U
+import Url.Parser as UP
 
 
 
 -- MAIN
 
 
+routeUrl : U.Url -> Route
+routeUrl url =
+    Maybe.withDefault NotFound (UP.parse routeParser url)
+
+
+parseUrl : U.Url -> Route
+parseUrl url =
+    case UP.parse matchRoute url of
+        Just route ->
+            route
+
+        Nothing ->
+            NotFound
+
+
+matchRoute : UP.Parser (Route -> a) a
+matchRoute =
+    UP.oneOf
+        [ UP.map Main UP.top
+        ]
+
+
+pushUrl : Route -> Nav.Key -> Cmd msg
+pushUrl route navKey =
+    routeToString route
+        |> Nav.pushUrl navKey
+
+
+routeToString : Route -> String
+routeToString route =
+    case route of
+        NotFound ->
+            "/not-found"
+
+        Main ->
+            "/"
+
+
 main : Program () Model Msg
 main =
-    Browser.sandbox { init = init, update = update, view = view }
+    Browser.application
+        { init = init
+        , view = view
+        , update = update
+        , subscriptions = \_ -> Sub.none
+        , onUrlRequest = LinkClicked
+        , onUrlChange = UrlChanged
+        }
 
 
-
--- MODEL
-
-
-type alias Model =
-    { name : String
-    , aspect : Bool
-    , level : String
-    , dexterity : String
-    , constitution : String
-    , strength : String
-    , wisdom : String
-    , intelligence : String
-    , bardic_voice : String
-    , appearance : String
-    , fortitude : String
-    , piety : String
-    , hearing : String
-    , eyesight : String
-    , eyesight_description : String
-    , base_roll_or_add : String
-    , primitive_talent : Bool
-    , use_generator : Bool
-    , harn_comeliness : String
-    , harn_strength : String
-    , harn_stamina : String
-    , harn_dexterity : String
-    , harn_agility : String
-    , harn_smell : String
-    , harn_hearing : String
-    , harn_eyesight : String
-    , harn_voice : String
-    , harn_aura : String
-    , harn_intelligence : String
-    , harn_will : String
-    , harn_morality : String
-    , harn_veteran_points : String
-    }
+init : () -> U.Url -> Nav.Key -> ( Model, Cmd Msg )
+init _ url nav_key =
+    let
+        model =
+            { route = parseUrl url
+            , page = NotFoundPage
+            , nav_key = nav_key
+            , attribute_model = defaultAttributeModel
+            , harn_model = defaultHarnModel
+            , m_seed = Nothing
+            }
+    in
+    initCurrentPage ( model, Cmd.none )
 
 
-init : Model
-init =
+initCurrentPage : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+initCurrentPage ( model, existingCmds ) =
+    case model.route of
+        NotFound ->
+            ( { model | page = NotFoundPage }, existingCmds )
+
+        Main ->
+            ( { model | page = MainPage }, existingCmds )
+
+
+defaultAttributeModel : AttributeModel
+defaultAttributeModel =
     { name = ""
     , aspect = False
     , level = ""
@@ -73,10 +111,15 @@ init =
     , piety = ""
     , hearing = ""
     , eyesight = ""
-    , eyesight_description = ""
     , base_roll_or_add = ""
     , primitive_talent = False
     , use_generator = False
+    }
+
+
+defaultHarnModel : HarnModel
+defaultHarnModel =
+    { harn_name = ""
     , harn_comeliness = ""
     , harn_strength = ""
     , harn_stamina = ""
@@ -91,6 +134,80 @@ init =
     , harn_will = ""
     , harn_morality = ""
     , harn_veteran_points = ""
+    , eyesight_description = ""
+    }
+
+
+
+-- MODEL
+
+
+type Page
+    = NotFoundPage
+    | MainPage
+
+
+type Route
+    = NotFound
+    | Main
+
+
+routeParser : UP.Parser (Route -> a) a
+routeParser =
+    UP.oneOf
+        [ UP.map Main
+            UP.top
+        ]
+
+
+type alias Model =
+    { route : Route
+    , page : Page
+    , nav_key : Nav.Key
+    , attribute_model : AttributeModel
+    , harn_model : HarnModel
+    , m_seed : Maybe R.Seed
+    }
+
+
+type alias AttributeModel =
+    { name : String
+    , aspect : Bool
+    , level : String
+    , dexterity : String
+    , constitution : String
+    , strength : String
+    , wisdom : String
+    , intelligence : String
+    , bardic_voice : String
+    , appearance : String
+    , fortitude : String
+    , piety : String
+    , hearing : String
+    , eyesight : String
+    , base_roll_or_add : String
+    , primitive_talent : Bool
+    , use_generator : Bool
+    }
+
+
+type alias HarnModel =
+    { harn_name : String
+    , harn_comeliness : String
+    , harn_strength : String
+    , harn_stamina : String
+    , harn_dexterity : String
+    , harn_agility : String
+    , harn_smell : String
+    , harn_hearing : String
+    , harn_eyesight : String
+    , harn_voice : String
+    , harn_aura : String
+    , harn_intelligence : String
+    , harn_will : String
+    , harn_morality : String
+    , harn_veteran_points : String
+    , eyesight_description : String
     }
 
 
@@ -100,7 +217,7 @@ init =
 
 type Msg
     = NameChanged String
-    | AspectToggled
+    | AspectToggled Bool
     | LevelChanged String
     | DexterityChanged String
     | ConstitutionChanged String
@@ -114,110 +231,281 @@ type Msg
     | HearingChanged String
     | EyesightChanged String
     | BaseRollOrAddSelected String
-    | PrimitiveTalentToggled
-    | UseGeneratorToggled
+    | PrimitiveTalentToggled Bool
+    | UseGeneratorToggled Bool
     | ConvertStatsClicked
+    | LinkClicked UrlRequest
+    | UrlChanged U.Url
+    | InitialIntegerThenConvertStats Int
 
 
-update : Msg -> Model -> Model
-update msg state_model =
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
     case msg of
-        NameChanged updatedName ->
-            { state_model | name = updatedName }
+        LinkClicked urlRequest ->
+            case urlRequest of
+                Browser.Internal url ->
+                    ( model, Nav.pushUrl model.nav_key (U.toString url) )
 
-        AspectToggled ->
-            { state_model | aspect = not state_model.aspect }
+                Browser.External href ->
+                    ( model, Nav.load href )
 
-        LevelChanged updatedLevel ->
-            { state_model | level = updatedLevel }
+        UrlChanged url ->
+            ( { model | route = routeUrl url }, Cmd.none )
 
-        DexterityChanged updatedDex ->
-            { state_model | dexterity = updatedDex }
+        NameChanged updated_name ->
+            let
+                attribute_model =
+                    model.attribute_model
 
-        ConstitutionChanged updatedCon ->
-            { state_model | constitution = updatedCon }
+                new_model =
+                    { attribute_model | name = updated_name }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
 
-        StrengthChanged updatedStr ->
-            { state_model | strength = updatedStr }
+        AspectToggled _ ->
+            let
+                attribute_model =
+                    model.attribute_model
 
-        WisdomChanged updatedWis ->
-            { state_model | wisdom = updatedWis }
+                new_model =
+                    { attribute_model | aspect = not attribute_model.aspect }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
 
-        IntelligenceChanged updatedInt ->
-            { state_model | intelligence = updatedInt }
+        LevelChanged updated_level ->
+            let
+                attribute_model =
+                    model.attribute_model
 
-        BardicVoiceChanged updated_BV ->
-            { state_model | bardic_voice = updated_BV }
+                new_model =
+                    { attribute_model | level = updated_level }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
 
-        AppearanceChanged updatedApp ->
-            { state_model | appearance = updatedApp }
+        DexterityChanged updated_dexterity ->
+            let
+                attribute_model =
+                    model.attribute_model
 
-        FortitudeChanged updatedFor ->
-            { state_model | fortitude = updatedFor }
+                new_model =
+                    { attribute_model | dexterity = updated_dexterity }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
 
-        PietyChanged updatedPie ->
-            { state_model | piety = updatedPie }
+        ConstitutionChanged updated_constitution ->
+            let
+                attribute_model =
+                    model.attribute_model
 
-        HearingChanged updatedHearing ->
-            { state_model | hearing = updatedHearing }
+                new_model =
+                    { attribute_model | constitution = updated_constitution }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
 
-        EyesightChanged updatedEyesight ->
-            { state_model | eyesight = updatedEyesight }
+        StrengthChanged updated_strength ->
+            let
+                attribute_model =
+                    model.attribute_model
+
+                new_model =
+                    { attribute_model | strength = updated_strength }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
+
+        WisdomChanged updated_wisdom ->
+            let
+                attribute_model =
+                    model.attribute_model
+
+                new_model =
+                    { attribute_model | wisdom = updated_wisdom }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
+
+        IntelligenceChanged updated_intelligence ->
+            let
+                attribute_model =
+                    model.attribute_model
+
+                new_model =
+                    { attribute_model | intelligence = updated_intelligence }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
+
+        BardicVoiceChanged updated_bardic_voice ->
+            let
+                attribute_model =
+                    model.attribute_model
+
+                new_model =
+                    { attribute_model | bardic_voice = updated_bardic_voice }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
+
+        AppearanceChanged updated_appearance ->
+            let
+                attribute_model =
+                    model.attribute_model
+
+                new_model =
+                    { attribute_model | appearance = updated_appearance }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
+
+        FortitudeChanged updated_fortitude ->
+            let
+                attribute_model =
+                    model.attribute_model
+
+                new_model =
+                    { attribute_model | fortitude = updated_fortitude }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
+
+        PietyChanged updated_piety ->
+            let
+                attribute_model =
+                    model.attribute_model
+
+                new_model =
+                    { attribute_model | piety = updated_piety }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
+
+        HearingChanged updated_hearing ->
+            let
+                attribute_model =
+                    model.attribute_model
+
+                new_model =
+                    { attribute_model | hearing = updated_hearing }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
+
+        EyesightChanged updated_eyesight ->
+            let
+                attribute_model =
+                    model.attribute_model
+
+                new_model =
+                    { attribute_model | eyesight = updated_eyesight }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
 
         BaseRollOrAddSelected updated_broa ->
-            case updated_broa of
-                "Roll" ->
-                    { state_model | base_roll_or_add = "Roll" }
+            let
+                attribute_model =
+                    model.attribute_model
 
-                "Add" ->
-                    { state_model | base_roll_or_add = "Add" }
+                new_model =
+                    case updated_broa of
+                        "Roll" ->
+                            { attribute_model | base_roll_or_add = "Roll" }
 
-                _ ->
-                    { state_model | base_roll_or_add = "" }
+                        "Add" ->
+                            { attribute_model | base_roll_or_add = "Add" }
 
-        PrimitiveTalentToggled ->
-            { state_model | primitive_talent = not state_model.primitive_talent }
+                        _ ->
+                            { attribute_model | base_roll_or_add = "Base" }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
 
-        UseGeneratorToggled ->
-            { state_model | use_generator = not state_model.use_generator }
+        PrimitiveTalentToggled _ ->
+            let
+                attribute_model =
+                    model.attribute_model
+
+                new_model =
+                    { attribute_model | primitive_talent = not attribute_model.primitive_talent }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
+
+        UseGeneratorToggled _ ->
+            let
+                attribute_model =
+                    model.attribute_model
+
+                new_model =
+                    { attribute_model | use_generator = not attribute_model.use_generator }
+            in
+            ( { model | attribute_model = new_model }, Cmd.none )
 
         ConvertStatsClicked ->
-            let
-                converted_stats =
-                    assignCandsStats state_model
-                        |> convert state_model.aspect
-                        |> applyHearing state_model.hearing
-                        |> applyEyesight state_model.eyesight
-                        |> checkPrimitiveTalent state_model.primitive_talent
-                        |> checkAndGenStats state_model.use_generator
-                        |> calcBROA state_model.base_roll_or_add
+            case model.m_seed of
+                Nothing ->
+                    ( model, R.generate InitialIntegerThenConvertStats (R.int 1 23000) )
 
-                veteran_points =
-                    assignVeteranPoints state_model.level
+                Just _ ->
+                    ( getModelWithUpdatedHarn model, Cmd.none )
+
+        InitialIntegerThenConvertStats the_int ->
+            let
+                seed =
+                    R.initialSeed the_int
+
+                new_model =
+                    { model | m_seed = Just seed }
             in
-            { state_model
-                | harn_comeliness = convertFloatToStringAndCeil converted_stats.comeliness
-                , harn_strength = convertFloatToStringAndCeil converted_stats.strength
-                , harn_stamina = convertFloatToStringAndCeil converted_stats.stamina
-                , harn_dexterity = convertFloatToStringAndCeil converted_stats.dexterity
-                , harn_agility = convertFloatToStringAndCeil converted_stats.agility
-                , harn_smell = convertFloatToStringAndCeil converted_stats.smell
-                , harn_hearing = convertFloatToStringAndCeil converted_stats.hearing
-                , harn_eyesight = convertFloatToStringAndCeil converted_stats.eyesight
-                , eyesight_description = checkAndApplyEyesightDescription state_model.eyesight
-                , harn_voice = convertFloatToStringAndCeil converted_stats.voice
-                , harn_aura = convertFloatToStringAndCeil converted_stats.aura
-                , harn_intelligence = convertFloatToStringAndCeil converted_stats.intelligence
-                , harn_will = convertFloatToStringAndCeil converted_stats.will
-                , harn_morality = convertFloatToStringAndCeil converted_stats.morality
+            ( getModelWithUpdatedHarn new_model, Cmd.none )
+
+
+getModelWithUpdatedHarn : Model -> Model
+getModelWithUpdatedHarn the_model =
+    let
+        attribute_model =
+            the_model.attribute_model
+
+        harn_model =
+            the_model.harn_model
+
+        seed =
+            the_model.m_seed
+
+        converted_stats =
+            assignCandsStats attribute_model
+                |> convert attribute_model.aspect
+                |> applyHearing attribute_model.hearing
+                |> applyEyesight attribute_model.eyesight
+                |> checkPrimitiveTalent attribute_model.primitive_talent
+                |> checkAndGenStats attribute_model.use_generator seed
+                |> calcBROA attribute_model.base_roll_or_add seed
+
+        veteran_points =
+            assignVeteranPoints attribute_model.level
+
+        ceilingLength =
+            0
+
+        new_harn_model =
+            { harn_model
+                | harn_name = checkForName attribute_model.name
+                , harn_comeliness = Round.ceiling ceilingLength converted_stats.comeliness
+                , harn_strength = Round.ceiling ceilingLength converted_stats.strength
+                , harn_stamina = Round.ceiling ceilingLength converted_stats.stamina
+                , harn_dexterity = Round.ceiling ceilingLength converted_stats.dexterity
+                , harn_agility = Round.ceiling ceilingLength converted_stats.agility
+                , harn_smell = Round.ceiling ceilingLength converted_stats.smell
+                , harn_hearing = Round.ceiling ceilingLength converted_stats.hearing
+                , harn_eyesight = Round.ceiling ceilingLength converted_stats.eyesight
+                , eyesight_description = checkAndApplyEyesightDescription attribute_model.eyesight
+                , harn_voice = Round.ceiling ceilingLength converted_stats.voice
+                , harn_aura = Round.ceiling ceilingLength converted_stats.aura
+                , harn_intelligence = Round.ceiling ceilingLength converted_stats.intelligence
+                , harn_will = Round.ceiling ceilingLength converted_stats.will
+                , harn_morality = Round.ceiling ceilingLength converted_stats.morality
                 , harn_veteran_points = veteran_points
             }
+    in
+    { the_model | harn_model = new_harn_model }
 
 
 addToEachStat : HarnStats -> HarnStats
 addToEachStat stats =
     let
-        x = 3.5
+        x =
+            3.5
+
         newStats =
             { stats
                 | comeliness = stats.comeliness + x
@@ -231,37 +519,37 @@ addToEachStat stats =
             }
     in
     newStats
-    
 
-assignCandsStats : Model -> CandsStats
-assignCandsStats stats_model =
+
+assignCandsStats : AttributeModel -> CandsStats
+assignCandsStats model =
     let
         str =
-            convertStringToInt stats_model.strength
+            convertStringToInt model.strength
 
         con =
-            convertStringToInt stats_model.constitution
+            convertStringToInt model.constitution
 
         dex =
-            convertStringToInt stats_model.dexterity
+            convertStringToInt model.dexterity
 
         wis =
-            convertStringToInt stats_model.wisdom
+            convertStringToInt model.wisdom
 
         int =
-            convertStringToInt stats_model.intelligence
+            convertStringToInt model.intelligence
 
         bvo =
-            convertStringToInt stats_model.bardic_voice
+            convertStringToInt model.bardic_voice
 
         app =
-            convertStringToInt stats_model.appearance
+            convertStringToInt model.appearance
 
         fort =
-            convertStringToInt stats_model.fortitude
+            convertStringToInt model.fortitude
 
         pie =
-            convertStringToInt stats_model.piety
+            convertStringToInt model.piety
 
         stats =
             CandsStats str con dex wis int bvo app fort pie
@@ -319,14 +607,14 @@ assignVeteranPoints level =
     x
 
 
-calcBROA : String -> HarnStats -> HarnStats
-calcBROA broa stats =
+calcBROA : String -> Maybe R.Seed -> HarnStats -> HarnStats
+calcBROA broa seed stats =
     case broa of
         "Add" ->
             addToEachStat stats
-        
+
         "Roll" ->
-            rollThenAddToEachStat stats
+            rollThenAddToEachStat stats seed
 
         _ ->
             stats
@@ -357,17 +645,23 @@ checkAndApplyEyesightDescription selected =
             ""
 
 
-checkAndGenStats : Bool -> HarnStats -> HarnStats
-checkAndGenStats gt stats =
+checkAndGenStats : Bool -> Maybe R.Seed -> HarnStats -> HarnStats
+checkAndGenStats gt seed stats =
     if gt == True then
-        let
-            new_stats =
-                stats
-        in
-        new_stats
+        genStats stats seed
 
     else
         stats
+
+
+checkForName : String -> String
+checkForName name =
+    case name of
+        "" ->
+            "Your Harn Character"
+
+        _ ->
+            name
 
 
 checkPrimitiveTalent : Bool -> HarnStats -> HarnStats
@@ -383,11 +677,6 @@ checkPrimitiveTalent pt stats =
         stats
 
 
-convertFloatToStringAndCeil : Float -> String
-convertFloatToStringAndCeil float =
-    String.fromInt (ceiling float)
-
-
 convertStringToInt : String -> Int
 convertStringToInt string =
     let
@@ -397,213 +686,330 @@ convertStringToInt string =
     Maybe.withDefault 0 result
 
 
-rollThenAddToEachStat : HarnStats -> HarnStats
-rollThenAddToEachStat stats =
-    stats
+genStats : HarnStats -> Maybe R.Seed -> HarnStats
+genStats stats seed =
+    case seed of
+        Nothing ->
+            stats
+
+        Just seed0 ->
+            let
+                ( agility_rolls, seed1 ) =
+                    R.step (R.list 4 (R.int 1 6)) seed0
+
+                ( smell_rolls, seed2 ) =
+                    R.step (R.list 4 (R.int 1 6)) seed1
+
+                ( hearing_rolls, seed3 ) =
+                    R.step (R.list 4 (R.int 1 6)) seed2
+
+                ( eyesight_rolls, seed4 ) =
+                    R.step (R.list 4 (R.int 1 6)) seed3
+
+                ( morality_rolls, _ ) =
+                    R.step (R.list 4 (R.int 1 6)) seed4
+
+                new_stats =
+                    { stats
+                        | agility = stats.agility + toFloat (dropLowestThenSum agility_rolls)
+                        , smell = stats.smell + toFloat (dropLowestThenSum smell_rolls)
+                        , hearing = stats.hearing + toFloat (dropLowestThenSum hearing_rolls)
+                        , eyesight = stats.eyesight + toFloat (dropLowestThenSum eyesight_rolls)
+                        , morality = stats.morality + toFloat (dropLowestThenSum morality_rolls)
+                    }
+            in
+            new_stats
+
+
+dropLowestThenSum : List Int -> Int
+dropLowestThenSum rolls =
+    List.sort rolls
+        |> List.drop 1
+        |> List.sum
+
+
+rollThenAddToEachStat : HarnStats -> Maybe R.Seed -> HarnStats
+rollThenAddToEachStat stats seed =
+    case seed of
+        Nothing ->
+            stats
+
+        Just seed0 ->
+            let
+                ( comeliness_roll, seed1 ) =
+                    R.step (R.int 1 6) seed0
+
+                ( strength_roll, seed2 ) =
+                    R.step (R.int 1 6) seed1
+
+                ( stamina_roll, seed3 ) =
+                    R.step (R.int 1 6) seed2
+
+                ( dexterity_roll, seed4 ) =
+                    R.step (R.int 1 6) seed3
+
+                ( voice_roll, seed5 ) =
+                    R.step (R.int 1 6) seed4
+
+                ( aura_roll, seed6 ) =
+                    R.step (R.int 1 6) seed5
+
+                ( intelligence_roll, seed7 ) =
+                    R.step (R.int 1 6) seed6
+
+                ( will_roll, _ ) =
+                    R.step (R.int 1 6) seed7
+
+                new_stats =
+                    { stats
+                        | comeliness = toFloat comeliness_roll + stats.comeliness
+                        , strength = toFloat strength_roll + stats.strength
+                        , stamina = toFloat stamina_roll + stats.stamina
+                        , dexterity = toFloat dexterity_roll + stats.dexterity
+                        , voice = toFloat voice_roll + stats.voice
+                        , aura = toFloat aura_roll + stats.aura
+                        , intelligence = toFloat intelligence_roll + stats.intelligence
+                        , will = toFloat will_roll + stats.will
+                    }
+            in
+            new_stats
+
 
 
 -- VIEW
 
 
-view : Model -> Html Msg
-view state_model =
-    div []
-        [ Html.form formStyle
-            [ div inputStyle
-                [ label ([ for "name" ] ++ labelStyle) [ text "Name" ]
-                , viewInput "text" "name" "Bob" state_model.name NameChanged
-                ]
-            , div []
-                [ label [ for "aspect" ] [ text "Well Auspicious?" ]
-                , input [ type_ "checkbox", checked state_model.aspect, onClick AspectToggled ] []
-                ]
-            , div []
-                [ label ([ for "level" ] ++ labelStyle) [ text "Level" ]
-                , viewInput "number" "level" "0" state_model.level LevelChanged
-                ]
-            , div []
-                [ label ([ for "strength" ] ++ labelStyle) [ text "STR" ]
-                , viewInput "number" "strength" "0" state_model.strength StrengthChanged
-                ]
-            , div []
-                [ label ([ for "constitution" ] ++ labelStyle) [ text "CON" ]
-                , viewInput "number" "constitution" "0" state_model.constitution ConstitutionChanged
-                ]
-            , div []
-                [ label ([ for "dexterity" ] ++ labelStyle) [ text "DEX" ]
-                , viewInput "number" "dexterity" "0" state_model.dexterity DexterityChanged
-                ]
-            , div []
-                [ label ([ for "wisdom" ] ++ labelStyle) [ text "WIS" ]
-                , viewInput "number" "wisdom" "0" state_model.wisdom WisdomChanged
-                ]
-            , div []
-                [ label ([ for "intelligence" ] ++ labelStyle) [ text "INT" ]
-                , viewInput "number" "intelligence" "0" state_model.intelligence IntelligenceChanged
-                ]
-            , div []
-                [ label ([ for "bardic_voice" ] ++ labelStyle) [ text "BV" ]
-                , viewInput "number" "bardic_voice" "0" state_model.bardic_voice BardicVoiceChanged
-                ]
-            , div []
-                [ label ([ for "appearance" ] ++ labelStyle) [ text "APP" ]
-                , viewInput "number" "appearance" "0" state_model.appearance AppearanceChanged
-                ]
-            , div []
-                [ label ([ for "fortitude" ] ++ labelStyle) [ text "FOR" ]
-                , viewInput "number" "fortitude" "0" state_model.fortitude FortitudeChanged
-                ]
-            , div []
-                [ label ([ for "piety" ] ++ labelStyle) [ text "PIETY" ]
-                , viewInput "number" "piety" "0" state_model.piety PietyChanged
-                ]
-            , div []
-                [ label ([ for "hearing" ] ++ labelStyle) [ text "Hearing" ]
-                , select [ name "hearing", on "change" (Json.Decode.map HearingChanged targetValue) ]
-                    [ option [ value "Very Poor" ] [ text "Very Poor" ]
-                    , option [ value "Poor" ] [ text "Poor" ]
-                    , option [ value "Normal", selected True ] [ text "Normal" ]
-                    , option [ value "Acute" ] [ text "Acute" ]
-                    , option [ value "Perfect" ] [ text "Perfect" ]
-                    ]
-                ]
-            , div []
-                [ label ([ for "eyesight" ] ++ labelStyle) [ text "Eyesight" ]
-                , select [ name "eyesight", on "change" (Json.Decode.map EyesightChanged targetValue) ]
-                    [ option [ value "Farsighted" ] [ text "Farsighted" ]
-                    , option [ value "Perfect", selected True ] [ text "Perfect" ]
-                    , option [ value "Nearsighted" ] [ text "Nearsighted" ]
-                    , option [ value "Very Nearsighted" ] [ text "Very Nearsighted" ]
-                    , option [ value "Myopic" ] [ text "Myopic" ]
-                    , option [ value "Color Blind, Blue Yellow" ] [ text "Color Blind to Blue and Yellow" ]
-                    , option [ value "Color Blind, Red Green" ] [ text "Color Blind to Red and Green" ]
-                    , option [ value "Color Blind" ] [ text "Totally Color Blind" ]
-                    , option [ value "Nightvision" ] [ text "Nightvision" ]
-                    ]
-                ]
-            , div []
-                [ h4 []
-                    [ text "Options" ]
-                , input [ name "finalStatsDecision", type_ "radio", value "None", on "change" (Json.Decode.map BaseRollOrAddSelected targetValue) ]
-                    []
-                , text "Base Stats"
-                , input [ name "finalStatsDecision", type_ "radio", value "Roll", on "change" (Json.Decode.map BaseRollOrAddSelected targetValue) ]
-                    []
-                , text "Add 1d6"
-                , input [ name "finalStatsDecision", type_ "radio", value "Add", on "change" (Json.Decode.map BaseRollOrAddSelected targetValue) ]
-                    []
-                , text "Add 3.5"
-                ]
-            , div []
-                [ label [ for "primitiveTalent" ] [ text "Primitive Talent?" ]
-                , input [ type_ "checkbox", name "primitiveTalent", checked state_model.primitive_talent, onClick PrimitiveTalentToggled ] []
-                ]
-            , div []
-                [ label [ for "useGenerator" ] [ text "Generate Non-Converted Stats?" ]
-                , input [ type_ "checkbox", name "useGenerator", checked state_model.use_generator, onClick UseGeneratorToggled ] []
-                ]
-            , button [ onClickNoDefault ConvertStatsClicked ] [ text "Convert" ]
+view : Model -> Document Msg
+view model =
+    { title = "CandS Conversion Tool"
+    , body = [ currentView model ]
+    }
+
+
+notFoundView : Html msg
+notFoundView =
+    layout [] <|
+        row [] [ text "Oops! The page you requested was not found!" ]
+
+
+currentView : Model -> Html Msg
+currentView model =
+    case model.page of
+        NotFoundPage ->
+            notFoundView
+
+        MainPage ->
+            mainView model
+
+
+mainView : Model -> Html Msg
+mainView model =
+    let
+        attribute_model =
+            model.attribute_model
+
+        harn_model =
+            model.harn_model
+    in
+    layout [] <|
+        row [ height fill, width fill ]
+            [ inputPanel attribute_model
+            , labelPanel
+            , outputPanel harn_model
             ]
-        , div resultStyle
-            [ div resultLabelStyle [ text state_model.name ]
-            , div resultLabelStyle [ text "Comeliness:" ]
-            , div resultNumberStyle [ text state_model.harn_comeliness ]
-            , div resultLabelStyle [ text "Strength:" ]
-            , div resultNumberStyle [ text state_model.harn_strength ]
-            , div resultLabelStyle [ text "Stamina:" ]
-            , div resultNumberStyle [ text state_model.harn_stamina ]
-            , div resultLabelStyle [ text "Dexterity:" ]
-            , div resultNumberStyle [ text state_model.harn_dexterity ]
-            , div resultLabelStyle [ text "Agility:" ]
-            , div resultNumberStyle [ text state_model.harn_agility ]
-            , div resultLabelStyle [ text "Smell:" ]
-            , div resultNumberStyle [ text state_model.harn_smell ]
-            , div resultLabelStyle [ text "Hearing:" ]
-            , div resultNumberStyle [ text state_model.harn_hearing ]
-            , div resultLabelStyle [ text "Eyesight:" ]
-            , div resultNumberStyle [ text state_model.harn_eyesight ]
-            , div resultNumberStyle [ text state_model.eyesight_description ]
-            , div resultLabelStyle [ text "Voice:" ]
-            , div resultNumberStyle [ text state_model.harn_voice ]
-            , div resultLabelStyle [ text "Aura:" ]
-            , div resultNumberStyle [ text state_model.harn_aura ]
-            , div resultLabelStyle [ text "Intelligence:" ]
-            , div resultNumberStyle [ text state_model.harn_intelligence ]
-            , div resultLabelStyle [ text "Will:" ]
-            , div resultNumberStyle [ text state_model.harn_will ]
-            , div resultLabelStyle [ text "Morality:" ]
-            , div resultNumberStyle [ text state_model.harn_morality ]
-            , div resultLabelStyle [ text "Veteran Points:" ]
-            , div resultNumberStyle [ text state_model.harn_veteran_points ]
+
+
+inputPanel : AttributeModel -> Element Msg
+inputPanel attribute_model =
+    column
+        [ height fill
+        , width <| fillPortion 1
+        , Background.color <| rgb255 21 21 21
+        , Font.color <| rgb255 200 200 200
+        , Font.size 13
+        , padding 15
+        , spacing 10
+        ]
+        [ textInput "Name" NameChanged "" attribute_model.name
+        , row [ spacing 5 ]
+            [ textInput "Level" LevelChanged "" attribute_model.level
+            , textInput "Dexterity" DexterityChanged "" attribute_model.dexterity
             ]
+        , row [ spacing 5 ]
+            [ textInput "Constitution" ConstitutionChanged "" attribute_model.constitution
+            , textInput "Strength" StrengthChanged "" attribute_model.strength
+            ]
+        , row [ spacing 5 ]
+            [ textInput "Wisdom" WisdomChanged "" attribute_model.wisdom
+            , textInput "Intelligence" IntelligenceChanged "" attribute_model.intelligence
+            ]
+        , row [ spacing 5 ]
+            [ textInput "Bardic Voice" BardicVoiceChanged "" attribute_model.bardic_voice
+            , textInput "Appearance" AppearanceChanged "" attribute_model.appearance
+            ]
+        , row [ spacing 5 ]
+            [ textInput "Fortitude" FortitudeChanged "" attribute_model.fortitude
+            , textInput "Piety" PietyChanged "" attribute_model.piety
+            ]
+        , toggleInput "Well Auspicious" AspectToggled attribute_model.aspect
+        , toggleInput "Primitive Talent" PrimitiveTalentToggled attribute_model.primitive_talent
+        , toggleInput "Generate Stats" UseGeneratorToggled attribute_model.use_generator
+        , statBonusRadio BaseRollOrAddSelected attribute_model.base_roll_or_add
+        , hearingRadio HearingChanged attribute_model.hearing
+        , eyesightRadio EyesightChanged attribute_model.eyesight
+        , convertButton
         ]
 
 
-viewInput : String -> String -> String -> String -> (String -> msg) -> Html msg
-viewInput t n p v toMsg =
-    input ([ type_ t, name n, placeholder p, value v, onInput toMsg ] ++ textBoxStyle) []
+labelPanel : Element Msg
+labelPanel =
+    column
+        [ height fill
+        , width <| fillPortion 1
+        , Background.color <| rgb255 56 56 56
+        , Font.color <| rgb255 200 200 200
+        , padding 5
+        ]
+        [ text "Name:"
+        , text "Comeliness:"
+        , text "Strength:"
+        , text "Stamina:"
+        , text "Dexterity:"
+        , text "Agility:"
+        , text "Smell:"
+        , text "Hearing:"
+        , text "Eyesight:"
+        , text "Voice:"
+        , text "Aura:"
+        , text "Intelligence:"
+        , text "Will:"
+        , text "Morality:"
+        , text "Veteran Points:"
+        ]
 
 
-onClickNoDefault : msg -> Attribute msg
-onClickNoDefault message =
-    let
-        config =
-            { message = message
-            , stopPropagation = True
-            , preventDefault = True
-            }
-    in
-    custom "click" (Json.Decode.succeed config)
+outputPanel : HarnModel -> Element Msg
+outputPanel harn_model =
+    column
+        [ height fill
+        , width <| fillPortion 3
+        , Background.color <| rgb255 56 56 56
+        , Font.color <| rgb255 200 200 200
+        , Font.family
+            [ Font.typeface "Courier New"
+            , Font.serif
+            ]
+        , padding 5
+        ]
+        [ text harn_model.harn_name
+        , text harn_model.harn_comeliness
+        , text harn_model.harn_strength
+        , text harn_model.harn_stamina
+        , text harn_model.harn_dexterity
+        , text harn_model.harn_agility
+        , text harn_model.harn_smell
+        , text harn_model.harn_hearing
+        , text harn_model.harn_eyesight
+        , text harn_model.harn_voice
+        , text harn_model.harn_aura
+        , text harn_model.harn_intelligence
+        , text harn_model.harn_will
+        , text harn_model.harn_morality
+        , text harn_model.harn_veteran_points
+        , el [ Font.size 11 ] (text harn_model.eyesight_description)
+        ]
 
 
-
--- CSS
-
-
-formStyle : List (Attribute msg)
-formStyle =
-    [ style "border-radius" "5px"
-    , style "background-color" "#f2f2f2"
-    , style "padding" "20px"
-    , style "width" "300px"
-    , style "height" "100%"
-    , style "font-family" "Arial"
-    , style "position" "fixed"
-    ]
+convertButton : Element Msg
+convertButton =
+    Input.button
+        [ Background.color <| rgb255 52 52 52
+        , Border.rounded 5
+        , padding 5
+        ]
+        { onPress = Just ConvertStatsClicked
+        , label = text "Convert Stats"
+        }
 
 
-inputStyle : List (Attribute msg)
-inputStyle =
-    [ style "padding" "2px 0"
-    ]
+textInput : String -> (String -> Msg) -> String -> String -> Element Msg
+textInput label_text update_func placeholder_text model_var =
+    Input.text
+        [ Background.color <| rgb255 32 32 32
+        , Border.color <| rgb255 21 21 21
+        ]
+        { label = Input.labelAbove [] (text label_text)
+        , onChange = update_func
+        , placeholder = Just (Input.placeholder [] (text placeholder_text))
+        , text = model_var
+        }
 
 
-labelStyle : List (Attribute msg)
-labelStyle =
-    [ style "display" "block"
-    ]
+toggleInput : String -> (Bool -> Msg) -> Bool -> Element Msg
+toggleInput label_text update_func model_var =
+    Input.checkbox
+        []
+        { label = Input.labelRight [] (text label_text)
+        , onChange = update_func
+        , icon = Input.defaultCheckbox
+        , checked = model_var
+        }
 
 
-resultStyle : List (Attribute msg)
-resultStyle =
-    [ style "padding" "10px 10px 10px 350px"
-    , style "font-family" "Arial"
-    ]
+statBonusRadio : (String -> Msg) -> String -> Element Msg
+statBonusRadio update_func model_var =
+    Input.radioRow
+        [ spacing 5
+        , paddingXY 0 5
+        ]
+        { label = Input.labelAbove [] (text "Converted Stat Options")
+        , onChange = update_func
+        , selected = Just model_var
+        , options =
+            [ Input.option "Base" (text "Base")
+            , Input.option "Roll" (text "Roll")
+            , Input.option "Add" (text "Add 3.5")
+            ]
+        }
 
 
-resultLabelStyle : List (Attribute msg)
-resultLabelStyle =
-    [ style "font-weight" "bold"
-    ]
+hearingRadio : (String -> Msg) -> String -> Element Msg
+hearingRadio update_func model_var =
+    Input.radio
+        [ spacing 5
+        , paddingXY 0 5
+        ]
+        { label = Input.labelAbove [] (text "Hearing:")
+        , onChange = update_func
+        , selected = Just model_var
+        , options =
+            [ Input.option "Very Poor" (text "Very Poor")
+            , Input.option "Poor" (text "Poor")
+            , Input.option "Normal" (text "Normal")
+            , Input.option "Acute" (text "Acute")
+            , Input.option "Perfect" (text "Perfect")
+            ]
+        }
 
 
-resultNumberStyle : List (Attribute msg)
-resultNumberStyle =
-    [ style "font-family" "\"Courier New\""
-    ]
-
-
-textBoxStyle : List (Attribute msg)
-textBoxStyle =
-    [ style "margin" "0 2px"
-    ]
+eyesightRadio : (String -> Msg) -> String -> Element Msg
+eyesightRadio update_func model_var =
+    Input.radio
+        [ spacing 5
+        , paddingXY 0 5
+        ]
+        { label = Input.labelAbove [] (text "Eyesight:")
+        , onChange = update_func
+        , selected = Just model_var
+        , options =
+            [ Input.option "Farsighted" (text "Farsighted")
+            , Input.option "Perfect" (text "Perfect")
+            , Input.option "Nearsighted" (text "Nearsighted")
+            , Input.option "Very Nearsighted" (text "Very Nearsighted")
+            , Input.option "Myopic" (text "Myopic")
+            , Input.option "Color Blind, Blue Yellow" (text "Color Blind to Blue and Yellow")
+            , Input.option "Color Blind, Red Green" (text "Color Blind to Red and Green")
+            , Input.option "Color Blind" (text "Totally Color Blind")
+            , Input.option "Nightvision" (text "Nightvision")
+            ]
+        }

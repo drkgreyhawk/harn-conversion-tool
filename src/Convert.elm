@@ -1,4 +1,4 @@
-module Convert exposing (CandsStats, convert, HarnStats)
+module Convert exposing (..)
 
 
 type alias CandsStats =
