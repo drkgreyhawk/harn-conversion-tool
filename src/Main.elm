@@ -1,6 +1,8 @@
 module Main exposing (..)
 
 import Browser exposing (Document, UrlRequest)
+import Browser.Dom
+import Browser.Events
 import Browser.Navigation as Nav
 import Convert exposing (CandsStats, HarnStats, convert)
 import Element exposing (..)
@@ -14,6 +16,7 @@ import Random as R
 import Round exposing (ceiling)
 import Url as U
 import Url.Parser as UP
+import Task
 
 
 
@@ -64,10 +67,15 @@ main =
         { init = init
         , view = view
         , update = update
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = subscriptions
         , onUrlRequest = LinkClicked
         , onUrlChange = UrlChanged
         }
+
+
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    Browser.Events.onResize SizeChanged
 
 
 init : () -> U.Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -80,9 +88,13 @@ init _ url nav_key =
             , attribute_model = defaultAttributeModel
             , harn_model = defaultHarnModel
             , m_seed = Nothing
+            , vp_width = 0
+            , vp_height = 0
             }
     in
-    initCurrentPage ( model, Cmd.none )
+    initCurrentPage
+        ( model
+        , Task.perform (\vp -> SizeChanged (round vp.scene.width) (round vp.scene.height)) Browser.Dom.getViewport )
 
 
 initCurrentPage : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
@@ -167,6 +179,8 @@ type alias Model =
     , attribute_model : AttributeModel
     , harn_model : HarnModel
     , m_seed : Maybe R.Seed
+    , vp_width : Int
+    , vp_height : Int
     }
 
 
@@ -237,11 +251,19 @@ type Msg
     | LinkClicked UrlRequest
     | UrlChanged U.Url
     | InitialIntegerThenConvertStats Int
+    | SizeChanged Int Int
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        SizeChanged w h ->
+            ( { model
+                | vp_width = w
+                , vp_height = h
+              }
+            , Cmd.none
+            )
         LinkClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
@@ -781,7 +803,7 @@ rollThenAddToEachStat stats seed =
 
 view : Model -> Document Msg
 view model =
-    { title = "CandS Conversion Tool"
+    { title = "DrkGreyHawk | C&S to HM3 Conversion Tool"
     , body = [ currentView model ]
     }
 
@@ -813,22 +835,23 @@ mainView model =
     in
     layout [] <|
         row [ height fill, width fill ]
-            [ inputPanel attribute_model
+            [ inputPanel model attribute_model
             , labelPanel
             , outputPanel harn_model
             ]
 
 
-inputPanel : AttributeModel -> Element Msg
-inputPanel attribute_model =
+inputPanel : Model -> AttributeModel -> Element Msg
+inputPanel model attribute_model =
     column
-        [ height fill
+        [ height (fill |> maximum model.vp_height)
         , width <| fillPortion 1
         , Background.color <| rgb255 21 21 21
         , Font.color <| rgb255 200 200 200
         , Font.size 13
         , padding 15
         , spacing 10
+        , scrollbarY
         ]
         [ textInput "Name" NameChanged "" attribute_model.name
         , row [ spacing 5 ]
