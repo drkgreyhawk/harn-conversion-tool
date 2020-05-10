@@ -1,182 +1,36 @@
-module Main exposing (..)
+module Main exposing (main)
 
-import Browser exposing (Document, UrlRequest)
+import Browser exposing (Document)
 import Browser.Dom
 import Browser.Events
-import Browser.Navigation as Nav
 import Convert exposing (CandsStats, HarnStats, convert)
-import Element exposing (..)
+import Element as Element
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
 import Html exposing (Html)
-import Json.Decode exposing (map)
 import Random as R
 import Round exposing (ceiling)
-import Url as U
-import Url.Parser as UP
 import Task
-
-
-
--- MAIN
-
-
-routeUrl : U.Url -> Route
-routeUrl url =
-    Maybe.withDefault NotFound (UP.parse routeParser url)
-
-
-parseUrl : U.Url -> Route
-parseUrl url =
-    case UP.parse matchRoute url of
-        Just route ->
-            route
-
-        Nothing ->
-            NotFound
-
-
-matchRoute : UP.Parser (Route -> a) a
-matchRoute =
-    UP.oneOf
-        [ UP.map Main UP.top
-        ]
-
-
-pushUrl : Route -> Nav.Key -> Cmd msg
-pushUrl route navKey =
-    routeToString route
-        |> Nav.pushUrl navKey
-
-
-routeToString : Route -> String
-routeToString route =
-    case route of
-        NotFound ->
-            "/not-found"
-
-        Main ->
-            "/"
 
 
 main : Program () Model Msg
 main =
-    Browser.application
+    Browser.document
         { init = init
         , view = view
         , update = update
         , subscriptions = subscriptions
-        , onUrlRequest = LinkClicked
-        , onUrlChange = UrlChanged
         }
-
-
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Browser.Events.onResize SizeChanged
-
-
-init : () -> U.Url -> Nav.Key -> ( Model, Cmd Msg )
-init _ url nav_key =
-    let
-        model =
-            { route = parseUrl url
-            , page = NotFoundPage
-            , nav_key = nav_key
-            , attribute_model = defaultAttributeModel
-            , harn_model = defaultHarnModel
-            , m_seed = Nothing
-            , vp_width = 0
-            , vp_height = 0
-            }
-    in
-    initCurrentPage
-        ( model
-        , Task.perform (\vp -> SizeChanged (round vp.scene.width) (round vp.scene.height)) Browser.Dom.getViewport )
-
-
-initCurrentPage : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-initCurrentPage ( model, existingCmds ) =
-    case model.route of
-        NotFound ->
-            ( { model | page = NotFoundPage }, existingCmds )
-
-        Main ->
-            ( { model | page = MainPage }, existingCmds )
-
-
-defaultAttributeModel : AttributeModel
-defaultAttributeModel =
-    { name = ""
-    , aspect = False
-    , level = ""
-    , dexterity = ""
-    , constitution = ""
-    , strength = ""
-    , wisdom = ""
-    , intelligence = ""
-    , bardic_voice = ""
-    , appearance = ""
-    , fortitude = ""
-    , piety = ""
-    , hearing = ""
-    , eyesight = ""
-    , base_roll_or_add = ""
-    , primitive_talent = False
-    , use_generator = False
-    }
-
-
-defaultHarnModel : HarnModel
-defaultHarnModel =
-    { harn_name = ""
-    , harn_comeliness = ""
-    , harn_strength = ""
-    , harn_stamina = ""
-    , harn_dexterity = ""
-    , harn_agility = ""
-    , harn_smell = ""
-    , harn_hearing = ""
-    , harn_eyesight = ""
-    , harn_voice = ""
-    , harn_aura = ""
-    , harn_intelligence = ""
-    , harn_will = ""
-    , harn_morality = ""
-    , harn_veteran_points = ""
-    , eyesight_description = ""
-    }
 
 
 
 -- MODEL
 
 
-type Page
-    = NotFoundPage
-    | MainPage
-
-
-type Route
-    = NotFound
-    | Main
-
-
-routeParser : UP.Parser (Route -> a) a
-routeParser =
-    UP.oneOf
-        [ UP.map Main
-            UP.top
-        ]
-
-
 type alias Model =
-    { route : Route
-    , page : Page
-    , nav_key : Nav.Key
-    , attribute_model : AttributeModel
+    { attribute_model : AttributeModel
     , harn_model : HarnModel
     , m_seed : Maybe R.Seed
     , vp_width : Int
@@ -225,6 +79,74 @@ type alias HarnModel =
     }
 
 
+init : () -> ( Model, Cmd Msg )
+init _ =
+    let
+        model =
+            { attribute_model = defaultAttributeModel
+            , harn_model = defaultHarnModel
+            , m_seed = Nothing
+            , vp_width = 0
+            , vp_height = 0
+            }
+    in
+    ( model
+    , Task.perform (\vp -> SizeChanged (round vp.scene.width) (round vp.scene.height)) Browser.Dom.getViewport
+    )
+
+
+defaultAttributeModel : AttributeModel
+defaultAttributeModel =
+    { name = ""
+    , aspect = False
+    , level = ""
+    , dexterity = ""
+    , constitution = ""
+    , strength = ""
+    , wisdom = ""
+    , intelligence = ""
+    , bardic_voice = ""
+    , appearance = ""
+    , fortitude = ""
+    , piety = ""
+    , hearing = ""
+    , eyesight = ""
+    , base_roll_or_add = ""
+    , primitive_talent = False
+    , use_generator = False
+    }
+
+
+defaultHarnModel : HarnModel
+defaultHarnModel =
+    { harn_name = ""
+    , harn_comeliness = ""
+    , harn_strength = ""
+    , harn_stamina = ""
+    , harn_dexterity = ""
+    , harn_agility = ""
+    , harn_smell = ""
+    , harn_hearing = ""
+    , harn_eyesight = ""
+    , harn_voice = ""
+    , harn_aura = ""
+    , harn_intelligence = ""
+    , harn_will = ""
+    , harn_morality = ""
+    , harn_veteran_points = ""
+    , eyesight_description = ""
+    }
+
+
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    Browser.Events.onResize SizeChanged
+
+
 
 -- UPDATE
 
@@ -248,8 +170,6 @@ type Msg
     | PrimitiveTalentToggled Bool
     | UseGeneratorToggled Bool
     | ConvertStatsClicked
-    | LinkClicked UrlRequest
-    | UrlChanged U.Url
     | InitialIntegerThenConvertStats Int
     | SizeChanged Int Int
 
@@ -264,16 +184,6 @@ update msg model =
               }
             , Cmd.none
             )
-        LinkClicked urlRequest ->
-            case urlRequest of
-                Browser.Internal url ->
-                    ( model, Nav.pushUrl model.nav_key (U.toString url) )
-
-                Browser.External href ->
-                    ( model, Nav.load href )
-
-        UrlChanged url ->
-            ( { model | route = routeUrl url }, Cmd.none )
 
         NameChanged updated_name ->
             let
@@ -470,6 +380,235 @@ update msg model =
                     { model | m_seed = Just seed }
             in
             ( getModelWithUpdatedHarn new_model, Cmd.none )
+
+
+
+-- VIEW
+
+
+view : Model -> Document Msg
+view model =
+    { title = "DrkGreyHawk | C&S to HM3 Conversion Tool"
+    , body = [ mainView model ]
+    }
+
+
+mainView : Model -> Html Msg
+mainView model =
+    let
+        attribute_model =
+            model.attribute_model
+
+        harn_model =
+            model.harn_model
+    in
+    Element.layout [] <|
+        Element.row [ Element.height Element.fill, Element.width Element.fill ]
+            [ inputPanel model attribute_model
+            , labelPanel
+            , outputPanel harn_model
+            ]
+
+
+inputPanel : Model -> AttributeModel -> Element.Element Msg
+inputPanel model attribute_model =
+    Element.column
+        [ Element.height (Element.fill |> Element.maximum model.vp_height)
+        , Element.width <| Element.fillPortion 1
+        , Background.color <| Element.rgb255 21 21 21
+        , Font.color <| Element.rgb255 200 200 200
+        , Font.size 13
+        , Element.padding 15
+        , Element.spacing 10
+        , Element.scrollbarY
+        ]
+        [ textInput "Name" NameChanged "" attribute_model.name
+        , Element.row [ Element.spacing 5 ]
+            [ textInput "Level" LevelChanged "" attribute_model.level
+            , textInput "Dexterity" DexterityChanged "" attribute_model.dexterity
+            ]
+        , Element.row [ Element.spacing 5 ]
+            [ textInput "Constitution" ConstitutionChanged "" attribute_model.constitution
+            , textInput "Strength" StrengthChanged "" attribute_model.strength
+            ]
+        , Element.row [ Element.spacing 5 ]
+            [ textInput "Wisdom" WisdomChanged "" attribute_model.wisdom
+            , textInput "Intelligence" IntelligenceChanged "" attribute_model.intelligence
+            ]
+        , Element.row [ Element.spacing 5 ]
+            [ textInput "Bardic Voice" BardicVoiceChanged "" attribute_model.bardic_voice
+            , textInput "Appearance" AppearanceChanged "" attribute_model.appearance
+            ]
+        , Element.row [ Element.spacing 5 ]
+            [ textInput "Fortitude" FortitudeChanged "" attribute_model.fortitude
+            , textInput "Piety" PietyChanged "" attribute_model.piety
+            ]
+        , toggleInput "Well Auspicious" AspectToggled attribute_model.aspect
+        , toggleInput "Primitive Talent" PrimitiveTalentToggled attribute_model.primitive_talent
+        , toggleInput "Generate Stats" UseGeneratorToggled attribute_model.use_generator
+        , statBonusRadio BaseRollOrAddSelected attribute_model.base_roll_or_add
+        , hearingRadio HearingChanged attribute_model.hearing
+        , eyesightRadio EyesightChanged attribute_model.eyesight
+        , convertButton
+        ]
+
+
+labelPanel : Element.Element Msg
+labelPanel =
+    Element.column
+        [ Element.height Element.fill
+        , Element.width <| Element.fillPortion 1
+        , Background.color <| Element.rgb255 56 56 56
+        , Font.color <| Element.rgb255 200 200 200
+        , Element.padding 5
+        ]
+        [ Element.text "Name:"
+        , Element.text "Comeliness:"
+        , Element.text "Strength:"
+        , Element.text "Stamina:"
+        , Element.text "Dexterity:"
+        , Element.text "Agility:"
+        , Element.text "Smell:"
+        , Element.text "Hearing:"
+        , Element.text "Eyesight:"
+        , Element.text "Voice:"
+        , Element.text "Aura:"
+        , Element.text "Intelligence:"
+        , Element.text "Will:"
+        , Element.text "Morality:"
+        , Element.text "Veteran Points:"
+        ]
+
+
+outputPanel : HarnModel -> Element.Element Msg
+outputPanel harn_model =
+    Element.column
+        [ Element.height Element.fill
+        , Element.width <| Element.fillPortion 3
+        , Background.color <| Element.rgb255 56 56 56
+        , Font.color <| Element.rgb255 200 200 200
+        , Font.family
+            [ Font.typeface "Courier New"
+            , Font.serif
+            ]
+        , Element.padding 5
+        ]
+        [ Element.text harn_model.harn_name
+        , Element.text harn_model.harn_comeliness
+        , Element.text harn_model.harn_strength
+        , Element.text harn_model.harn_stamina
+        , Element.text harn_model.harn_dexterity
+        , Element.text harn_model.harn_agility
+        , Element.text harn_model.harn_smell
+        , Element.text harn_model.harn_hearing
+        , Element.text harn_model.harn_eyesight
+        , Element.text harn_model.harn_voice
+        , Element.text harn_model.harn_aura
+        , Element.text harn_model.harn_intelligence
+        , Element.text harn_model.harn_will
+        , Element.text harn_model.harn_morality
+        , Element.text harn_model.harn_veteran_points
+        , Element.el [ Font.size 11 ] (Element.text harn_model.eyesight_description)
+        ]
+
+
+convertButton : Element.Element Msg
+convertButton =
+    Input.button
+        [ Background.color <| Element.rgb255 52 52 52
+        , Border.rounded 5
+        , Element.padding 5
+        ]
+        { onPress = Just ConvertStatsClicked
+        , label = Element.text "Convert Stats"
+        }
+
+
+textInput : String -> (String -> Msg) -> String -> String -> Element.Element Msg
+textInput label_text update_func placeholder_text model_var =
+    Input.text
+        [ Background.color <| Element.rgb255 32 32 32
+        , Border.color <| Element.rgb255 21 21 21
+        ]
+        { label = Input.labelAbove [] (Element.text label_text)
+        , onChange = update_func
+        , placeholder = Just (Input.placeholder [] (Element.text placeholder_text))
+        , text = model_var
+        }
+
+
+toggleInput : String -> (Bool -> Msg) -> Bool -> Element.Element Msg
+toggleInput label_text update_func model_var =
+    Input.checkbox
+        []
+        { label = Input.labelRight [] (Element.text label_text)
+        , onChange = update_func
+        , icon = Input.defaultCheckbox
+        , checked = model_var
+        }
+
+
+statBonusRadio : (String -> Msg) -> String -> Element.Element Msg
+statBonusRadio update_func model_var =
+    Input.radioRow
+        [ Element.spacing 5
+        , Element.paddingXY 0 5
+        ]
+        { label = Input.labelAbove [] (Element.text "Converted Stat Options")
+        , onChange = update_func
+        , selected = Just model_var
+        , options =
+            [ Input.option "Base" (Element.text "Base")
+            , Input.option "Roll" (Element.text "Roll")
+            , Input.option "Add" (Element.text "Add 3.5")
+            ]
+        }
+
+
+hearingRadio : (String -> Msg) -> String -> Element.Element Msg
+hearingRadio update_func model_var =
+    Input.radio
+        [ Element.spacing 5
+        , Element.paddingXY 0 5
+        ]
+        { label = Input.labelAbove [] (Element.text "Hearing:")
+        , onChange = update_func
+        , selected = Just model_var
+        , options =
+            [ Input.option "Very Poor" (Element.text "Very Poor")
+            , Input.option "Poor" (Element.text "Poor")
+            , Input.option "Normal" (Element.text "Normal")
+            , Input.option "Acute" (Element.text "Acute")
+            , Input.option "Perfect" (Element.text "Perfect")
+            ]
+        }
+
+
+eyesightRadio : (String -> Msg) -> String -> Element.Element Msg
+eyesightRadio update_func model_var =
+    Input.radio
+        [ Element.spacing 5
+        , Element.paddingXY 0 5
+        ]
+        { label = Input.labelAbove [] (Element.text "Eyesight:")
+        , onChange = update_func
+        , selected = Just model_var
+        , options =
+            [ Input.option "Farsighted" (Element.text "Farsighted")
+            , Input.option "Perfect" (Element.text "Perfect")
+            , Input.option "Nearsighted" (Element.text "Nearsighted")
+            , Input.option "Very Nearsighted" (Element.text "Very Nearsighted")
+            , Input.option "Myopic" (Element.text "Myopic")
+            , Input.option "Color Blind, Blue Yellow" (Element.text "Color Blind to Blue and Yellow")
+            , Input.option "Color Blind, Red Green" (Element.text "Color Blind to Red and Green")
+            , Input.option "Color Blind" (Element.text "Totally Color Blind")
+            , Input.option "Nightvision" (Element.text "Nightvision")
+            ]
+        }
+
+
+
+-- HELPERS
 
 
 getModelWithUpdatedHarn : Model -> Model
@@ -795,244 +934,3 @@ rollThenAddToEachStat stats seed =
                     }
             in
             new_stats
-
-
-
--- VIEW
-
-
-view : Model -> Document Msg
-view model =
-    { title = "DrkGreyHawk | C&S to HM3 Conversion Tool"
-    , body = [ currentView model ]
-    }
-
-
-notFoundView : Html msg
-notFoundView =
-    layout [] <|
-        row [] [ text "Oops! The page you requested was not found!" ]
-
-
-currentView : Model -> Html Msg
-currentView model =
-    case model.page of
-        NotFoundPage ->
-            notFoundView
-
-        MainPage ->
-            mainView model
-
-
-mainView : Model -> Html Msg
-mainView model =
-    let
-        attribute_model =
-            model.attribute_model
-
-        harn_model =
-            model.harn_model
-    in
-    layout [] <|
-        row [ height fill, width fill ]
-            [ inputPanel model attribute_model
-            , labelPanel
-            , outputPanel harn_model
-            ]
-
-
-inputPanel : Model -> AttributeModel -> Element Msg
-inputPanel model attribute_model =
-    column
-        [ height (fill |> maximum model.vp_height)
-        , width <| fillPortion 1
-        , Background.color <| rgb255 21 21 21
-        , Font.color <| rgb255 200 200 200
-        , Font.size 13
-        , padding 15
-        , spacing 10
-        , scrollbarY
-        ]
-        [ textInput "Name" NameChanged "" attribute_model.name
-        , row [ spacing 5 ]
-            [ textInput "Level" LevelChanged "" attribute_model.level
-            , textInput "Dexterity" DexterityChanged "" attribute_model.dexterity
-            ]
-        , row [ spacing 5 ]
-            [ textInput "Constitution" ConstitutionChanged "" attribute_model.constitution
-            , textInput "Strength" StrengthChanged "" attribute_model.strength
-            ]
-        , row [ spacing 5 ]
-            [ textInput "Wisdom" WisdomChanged "" attribute_model.wisdom
-            , textInput "Intelligence" IntelligenceChanged "" attribute_model.intelligence
-            ]
-        , row [ spacing 5 ]
-            [ textInput "Bardic Voice" BardicVoiceChanged "" attribute_model.bardic_voice
-            , textInput "Appearance" AppearanceChanged "" attribute_model.appearance
-            ]
-        , row [ spacing 5 ]
-            [ textInput "Fortitude" FortitudeChanged "" attribute_model.fortitude
-            , textInput "Piety" PietyChanged "" attribute_model.piety
-            ]
-        , toggleInput "Well Auspicious" AspectToggled attribute_model.aspect
-        , toggleInput "Primitive Talent" PrimitiveTalentToggled attribute_model.primitive_talent
-        , toggleInput "Generate Stats" UseGeneratorToggled attribute_model.use_generator
-        , statBonusRadio BaseRollOrAddSelected attribute_model.base_roll_or_add
-        , hearingRadio HearingChanged attribute_model.hearing
-        , eyesightRadio EyesightChanged attribute_model.eyesight
-        , convertButton
-        ]
-
-
-labelPanel : Element Msg
-labelPanel =
-    column
-        [ height fill
-        , width <| fillPortion 1
-        , Background.color <| rgb255 56 56 56
-        , Font.color <| rgb255 200 200 200
-        , padding 5
-        ]
-        [ text "Name:"
-        , text "Comeliness:"
-        , text "Strength:"
-        , text "Stamina:"
-        , text "Dexterity:"
-        , text "Agility:"
-        , text "Smell:"
-        , text "Hearing:"
-        , text "Eyesight:"
-        , text "Voice:"
-        , text "Aura:"
-        , text "Intelligence:"
-        , text "Will:"
-        , text "Morality:"
-        , text "Veteran Points:"
-        ]
-
-
-outputPanel : HarnModel -> Element Msg
-outputPanel harn_model =
-    column
-        [ height fill
-        , width <| fillPortion 3
-        , Background.color <| rgb255 56 56 56
-        , Font.color <| rgb255 200 200 200
-        , Font.family
-            [ Font.typeface "Courier New"
-            , Font.serif
-            ]
-        , padding 5
-        ]
-        [ text harn_model.harn_name
-        , text harn_model.harn_comeliness
-        , text harn_model.harn_strength
-        , text harn_model.harn_stamina
-        , text harn_model.harn_dexterity
-        , text harn_model.harn_agility
-        , text harn_model.harn_smell
-        , text harn_model.harn_hearing
-        , text harn_model.harn_eyesight
-        , text harn_model.harn_voice
-        , text harn_model.harn_aura
-        , text harn_model.harn_intelligence
-        , text harn_model.harn_will
-        , text harn_model.harn_morality
-        , text harn_model.harn_veteran_points
-        , el [ Font.size 11 ] (text harn_model.eyesight_description)
-        ]
-
-
-convertButton : Element Msg
-convertButton =
-    Input.button
-        [ Background.color <| rgb255 52 52 52
-        , Border.rounded 5
-        , padding 5
-        ]
-        { onPress = Just ConvertStatsClicked
-        , label = text "Convert Stats"
-        }
-
-
-textInput : String -> (String -> Msg) -> String -> String -> Element Msg
-textInput label_text update_func placeholder_text model_var =
-    Input.text
-        [ Background.color <| rgb255 32 32 32
-        , Border.color <| rgb255 21 21 21
-        ]
-        { label = Input.labelAbove [] (text label_text)
-        , onChange = update_func
-        , placeholder = Just (Input.placeholder [] (text placeholder_text))
-        , text = model_var
-        }
-
-
-toggleInput : String -> (Bool -> Msg) -> Bool -> Element Msg
-toggleInput label_text update_func model_var =
-    Input.checkbox
-        []
-        { label = Input.labelRight [] (text label_text)
-        , onChange = update_func
-        , icon = Input.defaultCheckbox
-        , checked = model_var
-        }
-
-
-statBonusRadio : (String -> Msg) -> String -> Element Msg
-statBonusRadio update_func model_var =
-    Input.radioRow
-        [ spacing 5
-        , paddingXY 0 5
-        ]
-        { label = Input.labelAbove [] (text "Converted Stat Options")
-        , onChange = update_func
-        , selected = Just model_var
-        , options =
-            [ Input.option "Base" (text "Base")
-            , Input.option "Roll" (text "Roll")
-            , Input.option "Add" (text "Add 3.5")
-            ]
-        }
-
-
-hearingRadio : (String -> Msg) -> String -> Element Msg
-hearingRadio update_func model_var =
-    Input.radio
-        [ spacing 5
-        , paddingXY 0 5
-        ]
-        { label = Input.labelAbove [] (text "Hearing:")
-        , onChange = update_func
-        , selected = Just model_var
-        , options =
-            [ Input.option "Very Poor" (text "Very Poor")
-            , Input.option "Poor" (text "Poor")
-            , Input.option "Normal" (text "Normal")
-            , Input.option "Acute" (text "Acute")
-            , Input.option "Perfect" (text "Perfect")
-            ]
-        }
-
-
-eyesightRadio : (String -> Msg) -> String -> Element Msg
-eyesightRadio update_func model_var =
-    Input.radio
-        [ spacing 5
-        , paddingXY 0 5
-        ]
-        { label = Input.labelAbove [] (text "Eyesight:")
-        , onChange = update_func
-        , selected = Just model_var
-        , options =
-            [ Input.option "Farsighted" (text "Farsighted")
-            , Input.option "Perfect" (text "Perfect")
-            , Input.option "Nearsighted" (text "Nearsighted")
-            , Input.option "Very Nearsighted" (text "Very Nearsighted")
-            , Input.option "Myopic" (text "Myopic")
-            , Input.option "Color Blind, Blue Yellow" (text "Color Blind to Blue and Yellow")
-            , Input.option "Color Blind, Red Green" (text "Color Blind to Red and Green")
-            , Input.option "Color Blind" (text "Totally Color Blind")
-            , Input.option "Nightvision" (text "Nightvision")
-            ]
-        }
